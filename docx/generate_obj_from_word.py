@@ -11,19 +11,20 @@ section_end_flag = '__结束__'
 """
 the goal of this python module:
  - read original_docx_file, and get those UNIQUE section_objs
- - save these section_objs into JSON or txt files  # todo now
- - use UI to freely change the order of these section_objs
+ - save these section_objs into docx files
+ - use UI to freely change the order of these section_objs  # todo now
  - after changing the order of sections, the section number should also be ordered automatically
 """
 
 
 class section_obj:
-    """obj for the smallest word section"""
+    """obj for the smallest word section, will be saved into TreeWidgetItem afterwards"""
     def __init__(self, para_dict: dict):
         """
         initiate the section_obj
         :param para_dict: a dict that stores the parameters which object-initiation needs
         """
+        self.section_lv = 0  # 章节的级别, 包括1级, 2级...
         self.elements_list = []
 
         for key in para_dict.keys():
@@ -119,8 +120,6 @@ class DocxHelper:
         pass
         return the_result_table
         pass
-
-
 
     pass
 

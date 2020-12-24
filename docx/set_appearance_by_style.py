@@ -94,13 +94,13 @@ def set_paragraph_format():
     """
     set the format of one paragraph(for test, the paragraph is not saved)
 
-    paragraph formats includes:
-    # horizontal alignment
-    # indentation
-    # tab stops
-    # paragraph spacing
-    # line spacing
-    # Pagination properties
+    paragraph formats includes:  段落格式
+    # horizontal alignment  水平位移
+    # indentation  缩进
+    # tab stops  tab空格数
+    # paragraph spacing  段落间间距
+    # line spacing   段落内,行间距
+    # Pagination properties  是否单开一页等属性
     """
     # common setting of paragraph format
     dcmt = Document()

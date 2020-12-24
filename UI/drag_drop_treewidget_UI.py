@@ -60,4 +60,6 @@ class Ui_MainWindow(object):
         self.label_2.setText(_translate("MainWindow", "最终生成树"))
         self.treeWidget.headerItem().setText(0, _translate("MainWindow", "最终生成树"))
         self.pushButton.setText(_translate("MainWindow", "根据TreeWidget生成tree_data"))
+
+
 from MyTreeWidget import MyTreeWidget
