@@ -57,7 +57,8 @@ class SectionObj:
     def __init__(self, raw_dict: dict):
         self.name = ''
         self.level = 0  # need an enum
-        self.desc = ''  # some description of this fruit
+        self.section_no = 0  # stores the section_num, the num_namespace is set in parent_section
+        self.desc = ''  # some description of the section
 
         for key in raw_dict.keys():
             setattr(self, key, raw_dict[key])

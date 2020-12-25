@@ -1,11 +1,14 @@
 import traceback
 
-from PyQt5.QtWidgets import QTreeWidget, QLineEdit, QTreeWidgetItem, QWidget, QAbstractItemView, QListView, QListWidget
-from UI.drag_drop_treewidget import DATA_ROLE, SectionObj
+from PyQt5.QtWidgets import QTreeWidget, QLineEdit, QTreeWidgetItem, QWidget, QAbstractItemView, QListView, QListWidget, \
+    QListWidgetItem
+from UI.drag_drop_treewidget import DATA_ROLE, SectionObj, SectionLvEnum
+
+DATA_COLUMN = 0  # used for treeWgtItem to set/get data
+TEXT_COLUMN = 0  # used for treeWgtItem to set/get text
 
 
 class MyTreeWidget(QTreeWidget):
-
     def __init__(self, parent=None):
         super().__init__(parent)
         # self.setDefaultDropAction(Qt.DropAction)
@@ -16,47 +19,87 @@ class MyTreeWidget(QTreeWidget):
         pass
 
     def dragMoveEvent(self, event):
-        """check_can_be_dropped HERE"""
-        # detection of dragMove is VERY sensitive..
-        current_item_data = self.__get_dropped_item_data(event)
-        # todo , detect the item under the current_item, which is potential to become the parent of current_item
-        try:
-            potential_parent_item = self.itemAt(event.pos())  # VERY useful, pos()!
-            print(potential_parent_item.text(0))
-        except AttributeError:  # when adding to ROOT
-
-            print("ROOT")
-
-        # can_be_dropped = self.__check_can_be_dropped(event, current_item_data)
-        # if can_be_dropped:
-        #     pass
-        #     self.dropEvent(event)
-        # elif not can_be_dropped:
-        #     pass
+        super(MyTreeWidget, self).dragMoveEvent(event)
         pass
 
     def dropEvent(self, event):
         """处理drop后的一系列操作"""
-        super(MyTreeWidget, self).dropEvent(event)
-        pass
+        """check_can_be_dropped HERE"""
+        # detection of dragMove is VERY sensitive..
+        dropped_item = self.__get_dropped_item(event)
+        treeWgt_item = self.__transfer_to_treeWidgetItem(dropped_item)
+        current_item_data = self.__get_dropped_item_data(treeWgt_item)
 
-    def __check_can_be_dropped(self, event, current_item_data):
-        """
-        check the possibility of dropping according to the current_item_data, and dropped parent item
-
-        :return: True or False
-        """
-        dropped_parent_item = ''  # xx
-        return True
+        potential_parent_item = self.itemAt(event.pos())  # VERY useful, pos()... 不可靠,蹭着边的时候有问题...
+        if potential_parent_item:
+            potential_parent_item = self.itemAt(event.pos())  # VERY useful, pos()... 不可靠,蹭着边的时候有问题...
+            can_be_dropped = self.__check_can_be_dropped(current_item_data, potential_parent_item)
+            if can_be_dropped:
+                potential_parent_item.addChild(treeWgt_item)
+            pass
+        elif not potential_parent_item:
+            can_be_dropped = self.__check_can_be_dropped(current_item_data, self)
+            if can_be_dropped:
+                self.addTopLevelItem(treeWgt_item)
+            pass
         pass
 
     @staticmethod
-    def __get_dropped_item_data(event):
-        source_widget = event.source()  # 获得发来event的source_widget, 再通过它来获得source_item
+    def __transfer_to_treeWidgetItem(original_item):
+        result_treeWidgetItem = None
+        if isinstance(original_item, QListWidgetItem):  # ?? what's basic type of listWidgetItem, treeWgtItem
+            result_treeWidgetItem = QTreeWidgetItem()
+            result_treeWidgetItem.setText(TEXT_COLUMN, original_item.text())
+            data = original_item.data(DATA_ROLE)
+            result_treeWidgetItem.setData(DATA_COLUMN, DATA_ROLE, data)
+            pass
+        elif isinstance(original_item, QTreeWidgetItem):
+            result_treeWidgetItem = original_item
+            pass
+        return result_treeWidgetItem
+        pass
+
+    @staticmethod
+    def __check_can_be_dropped(child_item_data: SectionObj, parent):
+        """
+        check the possibility of dropping according to the current_item_data, and dropped parent item
+
+        :param child_item_data: the data of child_treeWgtItem
+        :param parent: the parent, maybe a treeWgtItem , maybe a treeWgt
+        :return: True or False
+        """
+        can_be_added_rst = False
+        if not isinstance(parent, QTreeWidgetItem):  # check the type of parent
+            # child_item is going to add to topLevel of the tree
+            child_level = child_item_data.level
+            desired_level = SectionLvEnum.LV1
+            if child_item_data.level.value == SectionLvEnum.LV1.value:
+                can_be_added_rst = True
+            pass
+        elif isinstance(parent, QTreeWidgetItem):
+            # child_item is going to add to another treeWidgetItem
+            parent_item_data = parent.data(DATA_COLUMN, DATA_ROLE)
+            # assert isinstance(parent_item_data, SectionObj)
+            if child_item_data.level.value - parent_item_data.level.value == 1:
+                can_be_added_rst = True
+                pass
+            pass
+        return can_be_added_rst
+        pass
+
+    @staticmethod
+    def __get_dropped_item(event):
+        source_widget = event.source()
+        dropped_item = source_widget.currentItem()
+        return dropped_item
+        pass
+
+    @staticmethod
+    def __get_dropped_item_data(widget_item):
         try:
-            assert isinstance(source_widget, QAbstractItemView)  # use the base class of QListWidget, QTreeWidget
-            current_item_data = source_widget.currentItem().data(DATA_ROLE)
-            return current_item_data
+            if isinstance(widget_item, QTreeWidgetItem):
+                current_item_data = widget_item.data(DATA_COLUMN, DATA_ROLE)
+                return current_item_data
             pass
         except:
             traceback.print_exc()
