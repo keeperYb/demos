@@ -1,14 +1,16 @@
 import traceback
 
+from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtWidgets import QTreeWidget, QLineEdit, QTreeWidgetItem, QWidget, QAbstractItemView, QListView, QListWidget, \
     QListWidgetItem
-from UI.drag_drop_treewidget import DATA_ROLE, SectionObj, SectionLvEnum
-
+from UI.drag_drop_treewidget import DATA_ROLE, SectionObj, SectionLvEnum, DemoDragDropTreeWidget
 DATA_COLUMN = 0  # used for treeWgtItem to set/get data
 TEXT_COLUMN = 0  # used for treeWgtItem to set/get text
 
 
 class MyTreeWidget(QTreeWidget):
+    treeWgtItem_changed_signal = pyqtSignal(int)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         # self.setDefaultDropAction(Qt.DropAction)
@@ -36,11 +38,16 @@ class MyTreeWidget(QTreeWidget):
             can_be_dropped = self.__check_can_be_dropped(current_item_data, potential_parent_item)
             if can_be_dropped:
                 potential_parent_item.addChild(treeWgt_item)
+                self.setCurrentItem(treeWgt_item)
+                self.treeWgtItem_changed_signal.emit(1)
             pass
         elif not potential_parent_item:
             can_be_dropped = self.__check_can_be_dropped(current_item_data, self)
             if can_be_dropped:
                 self.addTopLevelItem(treeWgt_item)
+                self.setCurrentItem(treeWgt_item)
+                self.treeWgtItem_changed_signal.emit(1)
+                pass
             pass
         pass
 
@@ -71,8 +78,6 @@ class MyTreeWidget(QTreeWidget):
         can_be_added_rst = False
         if not isinstance(parent, QTreeWidgetItem):  # check the type of parent
             # child_item is going to add to topLevel of the tree
-            child_level = child_item_data.level
-            desired_level = SectionLvEnum.LV1
             if child_item_data.level.value == SectionLvEnum.LV1.value:
                 can_be_added_rst = True
             pass

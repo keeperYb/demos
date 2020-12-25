@@ -1,9 +1,9 @@
 """拖拽各小节的界面设计, 生成list"""
 from enum import Enum
 
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QCursor
-from PyQt5.QtWidgets import QApplication, QMainWindow, QTreeWidget, QMenu, QAction
+from PyQt5.QtWidgets import QApplication, QMainWindow, QTreeWidget, QMenu, QAction, QTreeWidgetItem
 
 import sys
 import os
@@ -18,19 +18,17 @@ from UI.drag_drop_treewidget_UI import Ui_MainWindow
 # todo total view
 """
 drag drop的策略:
-1. 顶层只有一级标题可放
-2. 一个级数的标题只能放到对应-1级的标题的子树中
-3. 同一个节点层中,不能有相同的标题, 但是在不同的命名空间中,可以有相同的标题
-4. 标题号根据每一个命名空间来自动判定, 但是标题号格式不要写死
+1. 顶层只有一级标题可放  OK
+2. 一个级数的标题只能放到对应-1级的标题的子树中 OK
+3. 同一个节点层中,不能有相同的标题, 但是在不同的命名空间中,可以有相同的标题 TODO
+4. 标题号根据每一个命名空间来自动判定, 但是标题号格式不要写死 OK
 
 todo now
-    -在 MyTreeWidget dropEvent() 中, 获取到data数据
-    -根据drop的上层node, 以及自身node情况, 判断can_be_dropped() __NOW
-    
 """
 section_list = []
 DATA_ROLE = 1
 DATA_COLUMN = 0  # the column where treeWidget stores data
+TEXT_COLUMN = 0
 
 
 # class section_obj:
@@ -85,7 +83,7 @@ class SectionFactory:
             {'name': '第一部分', 'level': SectionLvEnum.LV1, 'desc': '第一部分desc'},
             {'name': '第二部分', 'level': SectionLvEnum.LV1, 'desc': '第二部分desc'},
             {'name': '小节1', 'level': SectionLvEnum.LV2, 'desc': '小节1_desc'},
-            {'name': '小节a', 'level': SectionLvEnum.LV2, 'desc': '小节a_desc'}
+            {'name': '小节2', 'level': SectionLvEnum.LV2, 'desc': '小节2_desc'}
         ]
         final_section_obj_list = []
         for section_dict in section_dict_list:
@@ -100,6 +98,7 @@ class SectionFactory:
 
 class DemoDragDropTreeWidget(QMainWindow, Ui_MainWindow):
     """demo of drag and drop"""
+
 
     def __init__(self, parent=None, the_list=[]):
         self.the_list = the_list
@@ -159,24 +158,26 @@ class DemoDragDropTreeWidget(QMainWindow, Ui_MainWindow):
     def __tree_set_style(self):
         """set style for treeWidget"""
         treeWgt = self.treeWidget
-        # set accept drops (QWidget)
-        treeWgt.setAcceptDrops(True)
-        # # set drag enabled
-        # treeWgt.setDragEnabled(True)
+        assert isinstance(treeWgt, QTreeWidget)
+        treeWgt.setAcceptDrops(True)  # set accept drops (QWidget)
         pass
 
     def __connectSlots(self):
         # list
         listWgt = self.listWidget
         listWgt.itemClicked.connect(self.__onListItemClicked)
-        # tree
+
+        # treeWgt
         treeWgt = self.treeWidget
         assert isinstance(treeWgt, QTreeWidget)
+        '''item clicked'''
         treeWgt.itemClicked.connect(self.__onTreeItemClicked)
-        # treeWidget 右键方法
+        '''treeWidget 右键方法'''
         treeWgt.setContextMenuPolicy(Qt.CustomContextMenu)  # 自定义右键菜单, from QWidget
         treeWgt.customContextMenuRequested.connect(self.__onHandleCustomMenu)
-        # btn
+        '''custom slots for treeWgtItem addition and deletion'''
+        # do something
+        treeWgt.treeWgtItem_changed_signal.connect(self.__onTreeItemChanged)
         pass
 
     def __onHandleCustomMenu(self, pos):
@@ -203,10 +204,93 @@ class DemoDragDropTreeWidget(QMainWindow, Ui_MainWindow):
         # topLv delete
         if parent_tree_item is None:
             index = treeWgt.indexOfTopLevelItem(currentItem)
+            treeWgt.setCurrentItem(currentItem)
+            treeWgt.treeWgtItem_changed_signal.emit(0)
             treeWgt.takeTopLevelItem(index)
         # child delete
         elif parent_tree_item is not None:
+            treeWgt.setCurrentItem(currentItem)
+            treeWgt.treeWgtItem_changed_signal.emit(0)
             parent_tree_item.removeChild(currentItem)
+            pass
+
+        pass
+
+    def __onTreeItemChanged(self, add_delete_flag):
+        """handle issue when treeWgtItem changed"""
+        treeWgt = self.treeWidget
+        assert isinstance(treeWgt, QTreeWidget)
+        # judge and set section_no
+        # todo now, get the changed item??
+        '''add_delete_flag: 1 is add , 0 is delete'''
+        if add_delete_flag == 1:
+            self.__generate_section_no(add_delete_flag)
+            pass
+        elif add_delete_flag == 0:
+            self.__generate_section_no(add_delete_flag)
+            # print('delete ' + changed_item.text(0))
+            pass
+        treeWgt.expandAll()
+        pass
+
+    def __generate_section_no(self, add_delete_flag):
+        """
+        自动生成section_no
+
+        :param add_delete_flag: 判断是加还是减小节, add:1, delete:0
+        :return: None
+        """
+        treeWgt = self.treeWidget
+        changed_item = treeWgt.currentItem()
+        # print('add '+changed_item.text(0))
+        parent = changed_item.parent()
+        if not parent:  # parent is TreeWidget
+            topLv_count = treeWgt.topLevelItemCount()
+            for index in range(topLv_count):
+                each_topLv_item = treeWgt.topLevelItem(index)
+                data = each_topLv_item.data(DATA_COLUMN, DATA_ROLE)
+                assert isinstance(data, SectionObj)
+                # update data
+                if add_delete_flag == 1:
+                    data.section_no = index + 1  # section_no is count from 1
+                elif add_delete_flag == 0:
+                    data.section_no = index
+                # set appearance
+                self.__set_text_for_treeWgtItem(each_topLv_item)
+                # each_topLv_item.setText(TEXT_COLUMN, str(data.section_no) + data.name)
+            pass
+        elif parent:  # parent is TreeWidgetItem
+            child_count = parent.childCount()
+            pass
+            for child_index in range(child_count):
+                child_data = parent.child(child_index).data(DATA_COLUMN, DATA_ROLE)
+                assert isinstance(child_data, SectionObj)
+                if add_delete_flag == 1:
+                    child_data.section_no = child_index + 1  # section_no is count from 1
+                elif add_delete_flag == 0:
+                    child_data.section_no = child_index
+                # set the appearance
+                self.__set_text_for_treeWgtItem(parent.child(child_index))
+                pass
+        pass
+
+    @staticmethod
+    def __set_text_for_treeWgtItem(treeWgtItem: QTreeWidgetItem):
+        chinese_num = ['一', '二', '三', '四', '五',
+                       '六', '七', '八', '九', '十']
+        data = treeWgtItem.data(DATA_COLUMN, DATA_ROLE)
+        assert isinstance(data, SectionObj)
+        if data.level.value == SectionLvEnum.LV1.value:
+            try:
+                section_no_in_chinese = chinese_num[data.section_no - 1]  # section_no starts with 1
+            except IndexError:
+                section_no_in_chinese = '越界'
+                pass
+            treeWgtItem.setText(TEXT_COLUMN, str(section_no_in_chinese) + '.' + data.name)
+            pass
+        elif data.level.value != SectionLvEnum.LV1.value:
+            treeWgtItem.setText(TEXT_COLUMN, str(data.section_no) + '.' + data.name)
+            pass
         pass
 
     def __onTreeItemClicked(self):
