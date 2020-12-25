@@ -9,7 +9,8 @@ TEXT_COLUMN = 0  # used for treeWgtItem to set/get text
 
 
 class MyTreeWidget(QTreeWidget):
-    treeWgtItem_changed_signal = pyqtSignal(int)
+    treeWgtItem_add_signal = pyqtSignal(int)
+    treeWgtItem_delete_signal = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -34,19 +35,18 @@ class MyTreeWidget(QTreeWidget):
 
         potential_parent_item = self.itemAt(event.pos())  # VERY useful, pos()... 不可靠,蹭着边的时候有问题...
         if potential_parent_item:
-            potential_parent_item = self.itemAt(event.pos())  # VERY useful, pos()... 不可靠,蹭着边的时候有问题...
-            can_be_dropped = self.__check_can_be_dropped(current_item_data, potential_parent_item)
-            if can_be_dropped:
+            can_drop = self.__check_can_drop(current_item_data, potential_parent_item)
+            if can_drop:
                 potential_parent_item.addChild(treeWgt_item)
                 self.setCurrentItem(treeWgt_item)
-                self.treeWgtItem_changed_signal.emit(1)
+                self.treeWgtItem_add_signal.emit(1)
             pass
         elif not potential_parent_item:
-            can_be_dropped = self.__check_can_be_dropped(current_item_data, self)
-            if can_be_dropped:
+            can_drop = self.__check_can_drop(current_item_data, self)
+            if can_drop:
                 self.addTopLevelItem(treeWgt_item)
                 self.setCurrentItem(treeWgt_item)
-                self.treeWgtItem_changed_signal.emit(1)
+                self.treeWgtItem_add_signal.emit(1)
                 pass
             pass
         pass
@@ -67,7 +67,7 @@ class MyTreeWidget(QTreeWidget):
         pass
 
     @staticmethod
-    def __check_can_be_dropped(child_item_data: SectionObj, parent):
+    def __check_can_drop(child_item_data: SectionObj, parent):
         """
         check the possibility of dropping according to the current_item_data, and dropped parent item
 
@@ -75,21 +75,83 @@ class MyTreeWidget(QTreeWidget):
         :param parent: the parent, maybe a treeWgtItem , maybe a treeWgt
         :return: True or False
         """
-        can_be_added_rst = False
+        para_dict = {
+                     'child_item_data': child_item_data,
+                     'parent': parent
+        }
+        is_right_lv = MyTreeWidget.__check_is_right_level(para_dict)
+        no_duplicate_item = MyTreeWidget.__check_no_duplicate_item(para_dict)
+
+        return is_right_lv and no_duplicate_item
+        pass
+
+    @staticmethod
+    def __check_no_duplicate_item(para_dict):
+        is_no_duplicate_item = True  # it's true when initialization
+        # todo now, in the namespace of parent, there cannot be two items which have the same name...
+        parent = para_dict['parent']
+        child_item_data = para_dict['child_item_data']
+        if isinstance(parent, QTreeWidget):
+            # child differ from siblings(because parent is not treeWidgetItem)
+            other_siblings_count = parent.topLevelItemCount()
+            for sibling_index in range(other_siblings_count):
+                each_sibling = parent.topLevelItem(sibling_index)
+                each_sibling_data = each_sibling.data(DATA_COLUMN, DATA_ROLE)
+                is_different_item = MyTreeWidget.__is_different_item(child_item_data, each_sibling_data)
+                if not is_different_item:
+                    is_no_duplicate_item = False
+                    break
+                pass
+            pass
+        elif isinstance(parent, QTreeWidgetItem):
+            # child differ from parent, AND differ from siblings
+            '''check parent'''
+            parent_data =parent.data(DATA_COLUMN, DATA_ROLE)
+            is_different = MyTreeWidget.__is_different_item(child_item_data, parent_data)
+            if not is_different:
+                return False
+
+            '''check siblings'''
+            other_siblings_count = parent.childCount()
+            for sibling_index in range(other_siblings_count):
+                each_sibling = parent.child(sibling_index)
+                each_sibling_data = each_sibling.data(DATA_COLUMN, DATA_ROLE)
+                is_different_item = MyTreeWidget.__is_different_item(child_item_data, each_sibling_data)
+                if not is_different_item:
+                    is_no_duplicate_item = False
+                    break
+                pass
+            pass
+            pass
+
+        return is_no_duplicate_item
+        pass
+
+    @staticmethod
+    def __is_different_item(source_data:SectionObj, target_data:SectionObj):
+        """check if source_data differs from target_data"""
+        return source_data.name != target_data.name
+        pass
+
+    @staticmethod
+    def __check_is_right_level(para_dict):
+        is_right_lv = False
+        parent = para_dict['parent']
+        child_item_data = para_dict['child_item_data']
         if not isinstance(parent, QTreeWidgetItem):  # check the type of parent
             # child_item is going to add to topLevel of the tree
             if child_item_data.level.value == SectionLvEnum.LV1.value:
-                can_be_added_rst = True
+                is_right_lv = True
             pass
         elif isinstance(parent, QTreeWidgetItem):
             # child_item is going to add to another treeWidgetItem
             parent_item_data = parent.data(DATA_COLUMN, DATA_ROLE)
             # assert isinstance(parent_item_data, SectionObj)
             if child_item_data.level.value - parent_item_data.level.value == 1:
-                can_be_added_rst = True
+                is_right_lv = True
                 pass
             pass
-        return can_be_added_rst
+        return True  # is_right_lv todo, now the method just return True
         pass
 
     @staticmethod
